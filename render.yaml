@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: peinan-cooking-match
+    runtime: node
+    plan: free
+    buildCommand: npm ci
+    startCommand: npx tsx server/matchServer.ts
+    envVars:
+      - key: HOST
+        value: 0.0.0.0
+    healthCheckPath: /
