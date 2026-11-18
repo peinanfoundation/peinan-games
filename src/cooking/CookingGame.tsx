@@ -16,7 +16,8 @@ import { slotPosition } from './layout';
 import { DuelCookingGame } from './DuelCookingGame';
 import { MainMenu, MenuToggleButton } from './MainMenu';
 import { dealCards, formatElapsed, revealPair, type Round } from './logic';
-import { createMatchClient, type MatchStatus } from './matchClient';
+import type { MatchStatus } from './matchClient';
+import { createPeerMatchClient } from './peerMatchClient';
 import type { ClientMessage, RoomSnapshot, ServerMessage } from './matchProtocol';
 import { useLandscapeGate } from './useLandscapeGate';
 import './cooking.css';
@@ -214,6 +215,9 @@ export function CookingGame() {
   const [dishPop, setDishPop] = useState(false);
   const [matchStatus, setMatchStatus] = useState<MatchStatus>('idle');
   const [matchError, setMatchError] = useState<string | null>(null);
+  const [matchRoomCode, setMatchRoomCode] = useState<string | null>(null);
+  const [joinCode, setJoinCode] = useState('');
+  const [duelSetup, setDuelSetup] = useState(false);
   const [duel, setDuel] = useState<{ seat: 0 | 1; room: RoomSnapshot } | null>(null);
   const [inGame, setInGame] = useState(false);
   const [menuOpen, setMenuOpen] = useState(true);
@@ -227,7 +231,7 @@ export function CookingGame() {
   const heard = useRef(0);
   const previewLeft = useRef(10);
   const elapsedRef = useRef(0);
-  const matchRef = useRef<ReturnType<typeof createMatchClient> | null>(null);
+  const matchRef = useRef<ReturnType<typeof createPeerMatchClient> | null>(null);
   const duelListeners = useRef(new Set<(message: ServerMessage) => void>());
   goalRef.current = goal;
   stateRef.current = state;
@@ -239,13 +243,15 @@ export function CookingGame() {
 
   const ensureMatchClient = () => {
     if (matchRef.current) return matchRef.current;
-    matchRef.current = createMatchClient({
+    matchRef.current = createPeerMatchClient({
       onStatus: (status, error = null) => {
         setMatchStatus(status);
         setMatchError(error ?? null);
       },
+      onRoomCode: (code) => setMatchRoomCode(code),
       onMessage: (message) => {
         if (message.type === 'matched') {
+          setDuelSetup(false);
           setDuel({ seat: message.seat, room: message.room });
         }
         for (const listener of duelListeners.current) listener(message);
@@ -254,14 +260,30 @@ export function CookingGame() {
     return matchRef.current;
   };
 
-  const startMatchmaking = () => {
-    ensureMatchClient().connectAndQueue();
+  const openDuelSetup = () => {
+    setMenuOpen(false);
+    setDuelSetup(true);
+    setMatchStatus('idle');
+    setMatchError(null);
+    setMatchRoomCode(null);
+    setJoinCode('');
+  };
+
+  const createDuelRoom = () => {
+    ensureMatchClient().createRoom();
+  };
+
+  const joinDuelRoom = () => {
+    ensureMatchClient().joinRoom(joinCode);
   };
 
   const cancelMatchmaking = () => {
     matchRef.current?.cancel();
+    matchRef.current = null;
     setMatchStatus('idle');
     setMatchError(null);
+    setMatchRoomCode(null);
+    setDuelSetup(false);
     if (!inGame) setMenuOpen(true);
   };
 
@@ -269,8 +291,10 @@ export function CookingGame() {
     matchRef.current?.close();
     matchRef.current = null;
     setDuel(null);
+    setDuelSetup(false);
     setMatchStatus('idle');
     setMatchError(null);
+    setMatchRoomCode(null);
     setInGame(false);
     setMenuOpen(true);
   };
@@ -359,7 +383,7 @@ export function CookingGame() {
     const onKey = (event: KeyboardEvent) => {
       if (event.code !== 'Escape') return;
       event.preventDefault();
-      if (matchStatus === 'connecting' || matchStatus === 'queued' || matchStatus === 'error') {
+      if (duelSetup || matchStatus === 'connecting' || matchStatus === 'queued' || matchStatus === 'error') {
         cancelMatchmaking();
         return;
       }
@@ -528,15 +552,42 @@ export function CookingGame() {
   return (
     <div className="cook">
       <RotateGate show={needsRotate} />
-      {(matchStatus === 'connecting' || matchStatus === 'queued' || matchStatus === 'error') && (
+      {(duelSetup || matchStatus === 'connecting' || matchStatus === 'queued' || matchStatus === 'error') && (
         <div className="match-wait">
           <div className="panel">
-            <h2>{matchStatus === 'error' ? '連線失敗' : '等待對手'}</h2>
-            <p>
-              {matchStatus === 'connecting' && '正在連上對戰伺服器…'}
-              {matchStatus === 'queued' && '已進入佇列，對手按下連線對戰後會自動配對。'}
-              {matchStatus === 'error' && (matchError ?? '無法連線')}
-            </p>
+            <h2>
+              {matchStatus === 'error'
+                ? '連線失敗'
+                : matchStatus === 'queued' && matchRoomCode
+                  ? '等待對手加入'
+                  : '連線對戰'}
+            </h2>
+            {matchStatus === 'idle' && duelSetup && (
+              <>
+                <p>一人建立房間，另一人輸入房間碼加入。無需伺服器，可直接在瀏覽器對戰。</p>
+                <button type="button" onClick={createDuelRoom}>建立房間</button>
+                <div className="join-row">
+                  <input
+                    value={joinCode}
+                    onChange={(event) => setJoinCode(event.target.value.toUpperCase())}
+                    maxLength={6}
+                    placeholder="輸入 6 位房間碼"
+                    aria-label="房間碼"
+                  />
+                  <button type="button" onClick={joinDuelRoom}>加入房間</button>
+                </div>
+              </>
+            )}
+            {matchStatus === 'connecting' && <p>正在建立連線…</p>}
+            {matchStatus === 'queued' && matchRoomCode && (
+              <>
+                <p>把房間碼給對手：</p>
+                <p className="room-code">{matchRoomCode}</p>
+                <p>對手選擇「連線對戰 → 加入房間」並輸入此碼。</p>
+              </>
+            )}
+            {matchStatus === 'queued' && !matchRoomCode && <p>正在加入房間…</p>}
+            {matchStatus === 'error' && <p>{matchError ?? '無法連線'}</p>}
             <button type="button" onClick={cancelMatchmaking}>取消</button>
           </div>
         </div>
@@ -552,12 +603,12 @@ export function CookingGame() {
             ? [
                 { label: '繼續遊戲', onClick: closeMenu, primary: true },
                 { label: '重新開始', onClick: () => start(recipe.id) },
-                { label: '連線對戰', onClick: () => { closeMenu(); startMatchmaking(); } },
+                { label: '連線對戰', onClick: () => { closeMenu(); openDuelSetup(); } },
                 { label: '回主選單', onClick: returnToTitle },
               ]
             : [
                 { label: '開始遊戲', onClick: () => start(openingRecipe()), primary: true },
-                { label: '連線對戰', onClick: () => { setMenuOpen(false); startMatchmaking(); } },
+                { label: '連線對戰', onClick: openDuelSetup },
               ]
         }
       />
@@ -566,7 +617,7 @@ export function CookingGame() {
         found={state.found}
         elapsed={elapsed}
         potRef={potRef}
-        onDuel={() => { setMenuOpen(false); startMatchmaking(); }}
+        onDuel={openDuelSetup}
         onMenu={openMenu}
       />
       <section className="stage">
@@ -654,7 +705,7 @@ export function CookingGame() {
               {nextRecipe && (
                 <button type="button" className="next" onClick={() => start(nextRecipe.id)}>下一道：{nextRecipe.name}</button>
               )}
-              <button type="button" onClick={() => { setDishPop(false); startMatchmaking(); }}>連線對戰</button>
+              <button type="button" onClick={() => { setDishPop(false); openDuelSetup(); }}>連線對戰</button>
               <button type="button" onClick={returnToTitle}>主選單</button>
             </div>
           </div>
