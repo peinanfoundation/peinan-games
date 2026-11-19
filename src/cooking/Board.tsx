@@ -253,9 +253,6 @@ export function CardGrid({
   const blockedSet = useMemo(() => new Set(blocked ?? []), [blocked]);
   const p1 = useMemo(() => new Set(seatOpens?.[0] ?? []), [seatOpens]);
   const p2 = useMemo(() => new Set(seatOpens?.[1] ?? []), [seatOpens]);
-  // Duel: seatOpens is visibility only — click lock comes from `blocked` (own open/cleared).
-  // Solo: lock already-open cards via openSet (revealed).
-  const lockOpensForClick = !seatOpens;
   return (
     <group>
       {cards.map((id, index) => {
@@ -264,7 +261,6 @@ export function CardGrid({
         const owners = (p1.has(index) ? 1 : 0) + (p2.has(index) ? 2 : 0);
         const seatMark = owners === 3 ? 'both' : owners === 1 ? 'p1' : owners === 2 ? 'p2' : null;
         const mark = gone ? null : matchedSet.has(index) ? 'good' : seatMark ?? (openSet.has(index) ? 'held' : null);
-        const lockedOpen = lockOpensForClick && openSet.has(index);
         return (
           <Card
             key={`${index}-${id}`}
@@ -272,7 +268,7 @@ export function CardGrid({
             ingredientId={id}
             dishId={dishId}
             faceUp={isOpen}
-            playable={playable && !gone && !lockedOpen && !blockedSet.has(index)}
+            playable={playable && !gone && !openSet.has(index) && !blockedSet.has(index)}
             pending={pendingIndex === index}
             gone={gone}
             mark={mark}
