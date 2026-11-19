@@ -1,4 +1,3 @@
-import { createServer } from 'node:http';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { ALL_INGREDIENT_IDS, RECIPES } from '../src/cooking/ingredients.ts';
 import {
@@ -287,16 +286,8 @@ function onMessage(client: Client, raw: string) {
   }
 }
 
-const port = Number(process.env.PORT) || MATCH_PORT;
-const host = process.env.HOST || '0.0.0.0';
-const server = createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
-  res.end('peinan cooking match ok');
-});
-const wss = new WebSocketServer({ server });
-server.listen(port, host, () => {
-  console.log(`match server on http://${host}:${port} (ws upgrade enabled)`);
-});
+const wss = new WebSocketServer({ host: '127.0.0.1', port: MATCH_PORT });
+console.log(`match server on ws://127.0.0.1:${MATCH_PORT}`);
 
 wss.on('connection', (socket) => {
   const id = `c${serial}`;

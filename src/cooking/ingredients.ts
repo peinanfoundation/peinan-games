@@ -5,6 +5,10 @@ export interface Ingredient {
   color: string;
 }
 
+export function ingredientImageUrl(id: string) {
+  return `${import.meta.env.BASE_URL}ingredients/${id}.png`;
+}
+
 export type RecipeKind = 'cafe' | 'western' | 'chinese';
 
 export interface Recipe {

@@ -172,10 +172,31 @@ body,
   line-height: 1;
 }
 
-.ingredient-art {
+.ing-thumb {
   display: block;
   width: 28px;
   height: 28px;
+  object-fit: cover;
+  border-radius: 50%;
+  background: #fffaf3;
+}
+
+.ing-thumb.pot-thumb {
+  width: 30px;
+  height: 30px;
+}
+
+.ing-thumb.banner-thumb {
+  width: 36px;
+  height: 36px;
+}
+
+.fly-chip img {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 50%;
+  background: #fffaf3;
 }
 
 .pop-food .dish-art {
@@ -818,36 +839,90 @@ button:focus-visible {
   color: #e2b15a;
 }
 
-@media (max-width: 1100px) and (orientation: landscape) {
+@media (max-width: 1100px) {
   .cook {
-    grid-template-columns: minmax(180px, 26vw) minmax(0, 1fr);
+    grid-template-columns: minmax(148px, 22vw) minmax(0, 1fr);
   }
 
   .recipe {
     gap: 8px;
-    padding: 10px 10px 12px;
+    padding: 8px;
   }
 
-  .brand h1 {
-    font-size: 24px;
-  }
-
-  .dish h2 {
-    font-size: 20px;
-  }
-
+  .brand-copy,
+  .side-extra,
   .rule,
   .meters,
-  .time-note {
-    display: none;
+  .time-note,
+  .duel-entry,
+  .foe-menu,
+  .duel-scores,
+  .duel-leave {
+    display: none !important;
+  }
+
+  /* keep fly-to-pot target without taking layout space */
+  .recipe .pot-dock.side-extra {
+    display: block !important;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .brand.brand-row {
+    justify-content: flex-end;
+    margin: 0;
+  }
+
+  .brand-row .menu-toggle {
+    padding: 6px 10px;
+    font-size: 12px;
   }
 
   .paper {
     gap: 8px;
+    padding: 10px;
+  }
+
+  .dish {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .dish h2 {
+    font-size: 18px;
+    line-height: 1.2;
+  }
+
+  .plate {
+    width: 56px;
+    height: 56px;
+  }
+
+  .plate .dish-art {
+    width: 46px;
+    height: 46px;
   }
 
   .ings {
     gap: 4px;
+  }
+
+  .ings li {
+    padding: 5px 6px;
+    grid-template-columns: 8px 24px 1fr auto;
+    gap: 6px;
+    font-size: 13px;
+  }
+
+  .ings li em {
+    font-size: 11px;
   }
 
   .pop-food {

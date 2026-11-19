@@ -63,7 +63,7 @@ export function createMatchClient(handlers: {
       handlers.onMessage(message);
     };
     next.onerror = () => {
-      setStatus('error', '連不上對戰伺服器，請稍後再試或檢查連線');
+      setStatus('error', '連不上對戰伺服器，請先執行 npm run server');
     };
     next.onclose = () => {
       socket = null;

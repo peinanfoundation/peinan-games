@@ -226,7 +226,10 @@ interface CardGridProps {
   playable: boolean;
   pendingIndex: number | null;
   dishId?: string;
+  /** Both seats' open cards for shared visibility (duel). */
   seatOpens?: [number[], number[]];
+  /** Cards this player already has open — only these (plus blocked) lock clicks. */
+  lockedOpens?: number[];
   blocked?: number[];
   onPick: (index: number) => void;
 }
@@ -241,6 +244,7 @@ export function CardGrid({
   pendingIndex,
   dishId,
   seatOpens,
+  lockedOpens,
   blocked,
   onPick,
 }: CardGridProps) {
@@ -248,6 +252,10 @@ export function CardGrid({
     if (!seatOpens) return new Set(revealed);
     return new Set([...seatOpens[0], ...seatOpens[1]]);
   }, [revealed, seatOpens]);
+  const lockSet = useMemo(() => {
+    if (lockedOpens) return new Set(lockedOpens);
+    return openSet;
+  }, [lockedOpens, openSet]);
   const goneSet = useMemo(() => new Set(removed), [removed]);
   const matchedSet = useMemo(() => new Set(matched), [matched]);
   const blockedSet = useMemo(() => new Set(blocked ?? []), [blocked]);
@@ -268,7 +276,7 @@ export function CardGrid({
             ingredientId={id}
             dishId={dishId}
             faceUp={isOpen}
-            playable={playable && !gone && !openSet.has(index) && !blockedSet.has(index)}
+            playable={playable && !gone && !lockSet.has(index) && !blockedSet.has(index)}
             pending={pendingIndex === index}
             gone={gone}
             mark={mark}

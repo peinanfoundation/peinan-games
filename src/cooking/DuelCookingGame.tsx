@@ -4,8 +4,8 @@ import { Component, Suspense, useCallback, useEffect, useRef, useState, type Rea
 import { CardGrid, CardProjector, FrameBoard, Table } from './Board';
 import { Character, type WalkGoal } from './Character';
 import { DishArt } from './dishArt';
-import { IngredientArt, hasIngredientArt } from './ingredientArt';
-import { ingredientById, recipeById } from './ingredients';
+import { IngredientThumb } from './IngredientThumb';
+import { ingredientById, ingredientImageUrl, recipeById } from './ingredients';
 import { HOME_P1, HOME_P2, slotPosition } from './layout';
 import { MainMenu, MenuToggleButton } from './MainMenu';
 import { formatElapsed, visibleOpens } from './logic';
@@ -14,6 +14,7 @@ import './cooking.css';
 
 interface FlyChip {
   id: number;
+  ingredientId: string;
   emoji: string;
   x: number;
   y: number;
@@ -141,7 +142,7 @@ export function DuelCookingGame({ seat, room: initial, send, onLeave, onRoom, li
       const from = project(slot);
       const id = flySerial.current;
       flySerial.current += 1;
-      return { id, emoji, x: from.x, y: from.y, dx: toX - from.x, dy: toY - from.y };
+      return { id, ingredientId, emoji, x: from.x, y: from.y, dx: toX - from.x, dy: toY - from.y };
     });
     setFlies((list) => [...list, ...chips]);
     window.setTimeout(() => {
@@ -208,7 +209,7 @@ export function DuelCookingGame({ seat, room: initial, send, onLeave, onRoom, li
       />
       <aside className="recipe">
         <header className="brand brand-row">
-          <div>
+          <div className="brand-copy">
             <p>連線對戰</p>
             <h1>記憶烹飪</h1>
             <p className="play-clock">你是 {seat === 0 ? '1P · Granny' : '2P · Aj'}</p>
@@ -219,12 +220,12 @@ export function DuelCookingGame({ seat, room: initial, send, onLeave, onRoom, li
           <div className="dish">
             <span className="plate"><DishArt id={myRecipe.id} /></span>
             <div>
-              <p>你的菜單</p>
+              <p className="side-extra">你的菜單</p>
               <h2>{myRecipe.name}</h2>
-              <p className="need">{need} 種材料，各自湊對</p>
+              <p className="need side-extra">{need} 種材料，各自湊對</p>
             </div>
           </div>
-          <div className="foe-menu">
+          <div className="foe-menu side-extra">
             <span className="plate small"><DishArt id={foeRecipe.id} /></span>
             <div>
               <p>對手菜單</p>
@@ -232,16 +233,16 @@ export function DuelCookingGame({ seat, room: initial, send, onLeave, onRoom, li
               <em>同樣 {need} 種材料</em>
             </div>
           </div>
-          <div className="pot-dock" ref={potRef} aria-label="鍋">
+          <div className="pot-dock side-extra" ref={potRef} aria-label="鍋">
             <span className="pot-dock-label">你的鍋</span>
             <div className="pot-dock-fill">
               {me.found.length === 0 && <em>還沒有材料</em>}
               {me.found.map((id) => (
-                <span key={id}>{ingredientById(id).emoji}</span>
+                <IngredientThumb key={id} id={id} className="ing-thumb pot-thumb" />
               ))}
             </div>
           </div>
-          <div className="duel-scores">
+          <div className="duel-scores side-extra">
             <div className={seat === 0 ? 'you' : ''}>
               <span>1P · {recipeById(room.recipeIds[0]!).name}</span>
               <strong>{room.seats[0]!.found.length}/{need}</strong>
@@ -273,7 +274,7 @@ export function DuelCookingGame({ seat, room: initial, send, onLeave, onRoom, li
                 <li key={id} className={got ? 'got' : ''}>
                   <i style={{ background: item.color }} />
                   <span className="ing-icon">
-                    {hasIngredientArt(id) ? <IngredientArt id={id} /> : item.emoji}
+                    <IngredientThumb id={id} />
                   </span>
                   <b>{item.name}</b>
                   <em>{got ? '入鍋' : ''}</em>
@@ -281,12 +282,14 @@ export function DuelCookingGame({ seat, room: initial, send, onLeave, onRoom, li
               );
             })}
           </ol>
-          <p className="rule">同一副牌，看得到對方翻開的牌。菜單不同，但材料數量一樣。各自連鎖、各自入鍋。</p>
+          <p className="rule side-extra">同一副牌，看得到對方翻開的牌。菜單不同，但材料數量一樣。各自連鎖、各自入鍋。</p>
           {(room.disconnected[0] || room.disconnected[1]) && (
-            <p className="rule">對手已離線，你可以繼續做完或離開。</p>
+            <p className="rule side-extra">對手已離線，你可以繼續做完或離開。</p>
           )}
-          <button type="button" className="duel-leave" onClick={onLeave}>離開對戰</button>
-          <MenuToggleButton onClick={() => setMenuOpen(true)} />
+          <button type="button" className="duel-leave side-extra" onClick={onLeave}>離開對戰</button>
+          <div className="side-extra">
+            <MenuToggleButton onClick={() => setMenuOpen(true)} />
+          </div>
         </div>
       </aside>
       <section className="stage">
@@ -301,7 +304,7 @@ export function DuelCookingGame({ seat, room: initial, send, onLeave, onRoom, li
         {go && <div className="go">開始</div>}
         {room.lastMatch && (
           <div key={room.lastMatch.turn} className="banner correct">
-            <span>{ingredientById(room.lastMatch.ingredientId).emoji}</span>
+            <IngredientThumb id={room.lastMatch.ingredientId} className="ing-thumb banner-thumb" />
             {room.lastMatch.seat === seat ? '你入鍋一對' : '對手入鍋一對'}
           </div>
         )}
@@ -331,6 +334,7 @@ export function DuelCookingGame({ seat, room: initial, send, onLeave, onRoom, li
             pendingIndex={me.busy ? me.goalIndex : null}
             dishId={myRecipe.id}
             seatOpens={[room.seats[0]!.open, room.seats[1]!.open]}
+            lockedOpens={me.open}
             blocked={me.cleared}
             onPick={onPick}
           />
@@ -377,7 +381,7 @@ export function DuelCookingGame({ seat, room: initial, send, onLeave, onRoom, li
             ['--dy' as string]: `${chip.dy}px`,
           }}
         >
-          {chip.emoji}
+          <img src={ingredientImageUrl(chip.ingredientId)} alt="" draggable={false} />
         </span>
       ))}
       {room.phase === 'finished' && (

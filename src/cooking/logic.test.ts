@@ -218,6 +218,23 @@ describe('duel seats', () => {
     expect(revealSeat(cards, recipe, a, 0).outcome).toBe('ignore');
   });
 
+  it('lets both seats open and match the same card independently', () => {
+    let a = emptySeat();
+    let b = emptySeat();
+    a = revealSeat(cards, recipe, a, 0).seat;
+    b = revealSeat(cards, recipe, b, 0).seat;
+    expect(a.open).toEqual([0]);
+    expect(b.open).toEqual([0]);
+    expect(openOwners([a, b]).get(0)).toEqual([0, 1]);
+
+    const aMatch = revealSeat(cards, recipe, a, 1);
+    const bMatch = revealSeat(cards, recipe, b, 1);
+    expect(aMatch.outcome).toBe('match');
+    expect(bMatch.outcome).toBe('match');
+    expect(aMatch.seat.found).toEqual(['egg']);
+    expect(bMatch.seat.found).toEqual(['egg']);
+  });
+
   it('does not score a pair that is not on this seat menu', () => {
     let a = emptySeat();
     a = revealSeat(cards, ['noodle', 'spam'], a, 0).seat;

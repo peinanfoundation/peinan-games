@@ -4,11 +4,12 @@ import { Component, Suspense, useCallback, useEffect, useReducer, useRef, useSta
 import { CardGrid, CardProjector, FrameBoard, Table } from './Board';
 import { Character, type WalkGoal } from './Character';
 import { DishArt } from './dishArt';
-import { IngredientArt, hasIngredientArt } from './ingredientArt';
+import { IngredientThumb } from './IngredientThumb';
 import {
   ALL_INGREDIENT_IDS,
   RECIPES,
   ingredientById,
+  ingredientImageUrl,
   recipeById,
   type Recipe,
 } from './ingredients';
@@ -44,6 +45,7 @@ interface LastPick {
 
 interface FlyChip {
   id: number;
+  ingredientId: string;
   emoji: string;
   x: number;
   y: number;
@@ -396,7 +398,7 @@ export function CookingGame() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [matchStatus, duel, dishPop, inGame]);
+  }, [matchStatus, duelSetup, duel, dishPop, inGame]);
 
   useEffect(() => {
     if (!inGame || state.phase !== 'play') return undefined;
@@ -441,7 +443,7 @@ export function CookingGame() {
       const from = project(slot);
       const id = flySerial.current;
       flySerial.current += 1;
-      return { id, emoji, x: from.x, y: from.y, dx: toX - from.x, dy: toY - from.y };
+      return { id, ingredientId, emoji, x: from.x, y: from.y, dx: toX - from.x, dy: toY - from.y };
     });
     setFlies((list) => [...list, ...chips]);
     window.setTimeout(() => {
@@ -633,7 +635,7 @@ export function CookingGame() {
         {inGame && go && <div className="go">開始</div>}
         {inGame && state.last && state.phase === 'play' && (
           <div key={state.last.turn} className="banner correct">
-            <span>{ingredientById(state.last.ingredientId).emoji}</span>
+            <IngredientThumb id={state.last.ingredientId} className="ing-thumb banner-thumb" />
             一對入鍋
           </div>
         )}
@@ -722,7 +724,7 @@ export function CookingGame() {
             ['--dy' as string]: `${chip.dy}px`,
           }}
         >
-          {chip.emoji}
+          <img src={ingredientImageUrl(chip.ingredientId)} alt="" draggable={false} />
         </span>
       ))}
     </div>
@@ -748,7 +750,7 @@ function RecipePanel({
   return (
     <aside className="recipe">
       <header className="brand brand-row">
-        <div>
+        <div className="brand-copy">
           <p>今日菜單</p>
           <h1>記憶烹飪</h1>
           <p className="play-clock">{formatElapsed(elapsed)} · 不限時</p>
@@ -759,17 +761,17 @@ function RecipePanel({
         <div className="dish">
           <span className="plate"><DishArt id={recipe.id} /></span>
           <div>
-            <p>要做的料理</p>
+            <p className="side-extra">要做的料理</p>
             <h2>{recipe.name}</h2>
-            <p className="need">{recipe.ingredientIds.length} 種材料，每種要湊成一對</p>
+            <p className="need side-extra">{recipe.ingredientIds.length} 種材料，每種要湊成一對</p>
           </div>
         </div>
-        <div className="pot-dock" ref={potRef} aria-label="鍋">
+        <div className="pot-dock side-extra" ref={potRef} aria-label="鍋">
           <span className="pot-dock-label">入鍋</span>
           <div className="pot-dock-fill">
             {found.length === 0 && <em>還沒有材料</em>}
             {found.map((id) => (
-              <span key={id}>{ingredientById(id).emoji}</span>
+              <IngredientThumb key={id} id={id} className="ing-thumb pot-thumb" />
             ))}
           </div>
         </div>
@@ -781,7 +783,7 @@ function RecipePanel({
               <li key={id} className={got ? 'got' : ''}>
                 <i style={{ background: item.color }} />
                 <span className="ing-icon">
-                  {hasIngredientArt(id) ? <IngredientArt id={id} /> : item.emoji}
+                  <IngredientThumb id={id} />
                 </span>
                 <b>{item.name}</b>
                 <em>{got ? '入鍋' : ''}</em>
@@ -789,7 +791,7 @@ function RecipePanel({
             );
           })}
         </ol>
-        <div className="meters">
+        <div className="meters side-extra">
           <div>
             <span>已入鍋</span>
             <strong>{found.length} / {recipe.ingredientIds.length}</strong>
@@ -800,8 +802,8 @@ function RecipePanel({
             <em className="time-note">不限時</em>
           </div>
         </div>
-        <p className="rule">連續揭開兩張相同的食材才算一對，一對會飛進鍋裡。對不上可以再接下一張，最早的一張會合上。計時開始後不限時，配齊材料就完成。</p>
-        <div className="duel-entry">
+        <p className="rule side-extra">連續揭開兩張相同的食材才算一對，一對會飛進鍋裡。對不上可以再接下一張，最早的一張會合上。計時開始後不限時，配齊材料就完成。</p>
+        <div className="duel-entry side-extra">
           <button type="button" onClick={onDuel}>連線對戰</button>
           <MenuToggleButton onClick={onMenu} />
         </div>

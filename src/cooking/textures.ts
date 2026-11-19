@@ -2,8 +2,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { CanvasTexture, RepeatWrapping, SRGBColorSpace, type Texture } from 'three';
 import { DishArt } from './dishArt';
-import { IngredientArt, hasIngredientArt } from './ingredientArt';
-import { ingredientById, recipeById, type Ingredient } from './ingredients';
+import { ingredientById, ingredientImageUrl, recipeById, type Ingredient } from './ingredients';
 
 const fronts = new Map<string, Texture>();
 const backs = new Map<string, Texture>();
@@ -54,13 +53,6 @@ function roundRect(
   ctx.closePath();
 }
 
-function ingredientSvgMarkup(ingredientId: string) {
-  if (!hasIngredientArt(ingredientId)) return null;
-  const markup = renderToStaticMarkup(createElement(IngredientArt, { id: ingredientId }));
-  if (!markup) return null;
-  return markup.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"');
-}
-
 function paintFrontShell(ctx: CanvasRenderingContext2D, ingredient: Ingredient) {
   roundRect(ctx, 16, 16, 480, 560, 48);
   ctx.fillStyle = '#f4e7d2';
@@ -106,32 +98,38 @@ function paintFrontLabel(ctx: CanvasRenderingContext2D, ingredient: Ingredient) 
   ctx.fillText(ingredient.name, 256, 488);
 }
 
-function paintFront(ingredient: Ingredient) {
-  const { canvas, ctx } = canvasOf(512, 592);
-  paintFrontShell(ctx, ingredient);
-
-  const svg = ingredientSvgMarkup(ingredient.id);
-  if (svg) {
-    const map = textureFrom(canvas);
-    paintFrontLabel(ctx, ingredient);
-    map.needsUpdate = true;
-    const image = new Image();
-    image.onload = () => {
-      paintFrontShell(ctx, ingredient);
-      ctx.drawImage(image, 96, 90, 320, 320);
-      paintFrontLabel(ctx, ingredient);
-      map.needsUpdate = true;
-    };
-    image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
-    return map;
-  }
-
+function drawIngredientFallback(ctx: CanvasRenderingContext2D, ingredient: Ingredient) {
   ctx.font = '210px "Apple Color Emoji", "Segoe UI Emoji", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(ingredient.emoji, 256, 250);
+}
+
+function paintFront(ingredient: Ingredient) {
+  const { canvas, ctx } = canvasOf(512, 592);
+  paintFrontShell(ctx, ingredient);
+  drawIngredientFallback(ctx, ingredient);
   paintFrontLabel(ctx, ingredient);
-  return textureFrom(canvas);
+  const map = textureFrom(canvas);
+
+  const image = new Image();
+  image.decoding = 'async';
+  image.onload = () => {
+    paintFrontShell(ctx, ingredient);
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(256, 248, 128, 108, 0, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.drawImage(image, 96, 90, 320, 320);
+    ctx.restore();
+    paintFrontLabel(ctx, ingredient);
+    map.needsUpdate = true;
+  };
+  image.onerror = () => {
+    /* keep emoji fallback already painted */
+  };
+  image.src = ingredientImageUrl(ingredient.id);
+  return map;
 }
 
 function paintBackShell(ctx: CanvasRenderingContext2D) {
