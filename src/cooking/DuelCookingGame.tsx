@@ -281,7 +281,7 @@ export function DuelCookingGame({ seat, room: initial, send, onLeave, onRoom, li
               );
             })}
           </ol>
-          <p className="rule">同一副牌，看得到對方翻開的牌。菜單不同，但材料數量一樣。各自連鎖、各自入鍋。</p>
+          <p className="rule">同一副牌，看得到對方翻開的牌；對方翻著的你仍可點。菜單不同、材料數相同。各自連鎖、各自入鍋，角色可同格。</p>
           {(room.disconnected[0] || room.disconnected[1]) && (
             <p className="rule">對手已離線，你可以繼續做完或離開。</p>
           )}
@@ -331,7 +331,7 @@ export function DuelCookingGame({ seat, room: initial, send, onLeave, onRoom, li
             pendingIndex={me.busy ? me.goalIndex : null}
             dishId={myRecipe.id}
             seatOpens={[room.seats[0]!.open, room.seats[1]!.open]}
-            blocked={me.cleared}
+            blocked={[...me.cleared, ...me.open]}
             onPick={onPick}
           />
           <Suspense fallback={null}>

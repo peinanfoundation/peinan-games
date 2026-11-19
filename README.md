@@ -18,8 +18,10 @@ npm run dev
 
 ## 連線對戰
 
-記憶烹飪對戰需要 WebSocket 伺服器（GitHub Pages 無法承載）。
+記憶烹飪已改為 **PeerJS 房間碼對戰**（純前端，不必另開伺服器）：
 
-1. 部署本 repo 的 `server/matchServer.ts`（可用 Render 的 `render.yaml`）
-2. 在 GitHub repo Secrets 設定 `MATCH_WS_URL`，例如 `wss://your-match-host`
-3. 重新跑 Pages workflow 建置前端
+1. 玩家 A：連線對戰 → 建立房間 → 把 6 位房間碼給對手
+2. 玩家 B：連線對戰 → 輸入房間碼 → 加入房間
+3. 配對成功後自動開始
+
+（本機仍可用 `npm run server` 跑舊的 WebSocket 伺服器作開發，正式站不需要。）

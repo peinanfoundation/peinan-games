@@ -211,6 +211,16 @@ describe('duel seats', () => {
     expect(openOwners([a, b]).get(2)).toEqual([1]);
   });
 
+  it('lets a seat reveal a card the other seat already has open', () => {
+    let a = emptySeat();
+    let b = emptySeat();
+    a = revealSeat(cards, recipe, a, 0).seat;
+    const shared = revealSeat(cards, recipe, b, 0);
+    expect(shared.outcome).toBe('open');
+    expect(shared.seat.open).toEqual([0]);
+    expect(openOwners([a, shared.seat]).get(0)).toEqual([0, 1]);
+  });
+
   it('ignores a seat clicking its own cleared cards', () => {
     let a = emptySeat();
     a = revealSeat(cards, recipe, a, 0).seat;
