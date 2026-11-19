@@ -580,7 +580,12 @@ export function CookingGame() {
                 </div>
               </>
             )}
-            {matchStatus === 'connecting' && <p>正在建立連線…</p>}
+            {matchStatus === 'connecting' && (
+              <>
+                {matchRoomCode && <p className="room-code">{matchRoomCode}</p>}
+                <p>{matchRoomCode ? '正在登記房間到配對服務，通常幾秒內完成…' : '正在建立連線…'}</p>
+              </>
+            )}
             {matchStatus === 'queued' && matchRoomCode && (
               <>
                 <p>把房間碼給對手：</p>
@@ -589,7 +594,12 @@ export function CookingGame() {
               </>
             )}
             {matchStatus === 'queued' && !matchRoomCode && <p>正在加入房間…</p>}
-            {matchStatus === 'error' && <p>{matchError ?? '無法連線'}</p>}
+            {matchStatus === 'error' && (
+              <>
+                <p>{matchError ?? '無法連線'}</p>
+                <button type="button" onClick={createDuelRoom}>再試一次</button>
+              </>
+            )}
             <button type="button" onClick={cancelMatchmaking}>取消</button>
           </div>
         </div>

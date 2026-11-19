@@ -1,4 +1,4 @@
-import { Peer, type DataConnection } from 'peerjs';
+import { Peer, type DataConnection, type PeerError } from 'peerjs';
 import { ALL_INGREDIENT_IDS, RECIPES } from './ingredients';
 import {
   dealDuelCards,
@@ -38,6 +38,9 @@ interface Room {
   previewTimer: ReturnType<typeof setTimeout> | null;
 }
 
+const OPEN_TIMEOUT_MS = 12_000;
+const MAX_HOST_ATTEMPTS = 3;
+
 function randomRoomCode() {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let code = '';
@@ -49,6 +52,44 @@ function randomRoomCode() {
 
 export function peerIdForRoom(code: string) {
   return `peinan-cook-${code.toUpperCase()}`;
+}
+
+function peerOptions() {
+  const host = (import.meta.env.VITE_PEER_HOST as string | undefined)?.trim();
+  const iceServers = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+  ];
+  if (host) {
+    return {
+      host,
+      port: Number(import.meta.env.VITE_PEER_PORT ?? 443),
+      path: (import.meta.env.VITE_PEER_PATH as string | undefined)?.trim() || '/',
+      secure: import.meta.env.VITE_PEER_SECURE !== 'false',
+      debug: 1 as const,
+      config: { iceServers },
+    };
+  }
+  return {
+    host: '0.peerjs.com',
+    port: 443,
+    path: '/',
+    secure: true,
+    key: 'peerjs',
+    debug: 1 as const,
+    config: { iceServers },
+  };
+}
+
+function errorLabel(err: unknown, fallback: string) {
+  const type = (err as PeerError<string> | undefined)?.type;
+  if (type === 'unavailable-id') return '房間碼剛被佔用，正在換一組…';
+  if (type === 'network' || type === 'socket-error' || type === 'server-error') {
+    return '配對服務連不上，請再試一次';
+  }
+  if (type === 'peer-unavailable') return '找不到房間，請確認房間碼';
+  if (type === 'browser-incompatible') return '此瀏覽器不支援連線對戰';
+  return fallback;
 }
 
 export function createPeerMatchClient(handlers: {
@@ -64,6 +105,8 @@ export function createPeerMatchClient(handlers: {
   let role: 'host' | 'guest' | null = null;
   let room: Room | null = null;
   let serial = 1;
+  let generation = 0;
+  let openTimer: ReturnType<typeof setTimeout> | null = null;
 
   const setStatus = (next: MatchStatus, error: string | null = null) => {
     status = next;
@@ -72,6 +115,13 @@ export function createPeerMatchClient(handlers: {
 
   const emit = (message: ServerMessage) => {
     handlers.onMessage(message);
+  };
+
+  const clearOpenTimer = () => {
+    if (openTimer) {
+      clearTimeout(openTimer);
+      openTimer = null;
+    }
   };
 
   const sendToGuest = (message: ServerMessage) => {
@@ -199,58 +249,115 @@ export function createPeerMatchClient(handlers: {
   };
 
   const destroyPeer = () => {
+    generation += 1;
+    clearOpenTimer();
     if (room?.previewTimer) clearTimeout(room.previewTimer);
     room = null;
     guestConn?.close();
     hostConn?.close();
     guestConn = null;
     hostConn = null;
-    peer?.destroy();
+    const old = peer;
     peer = null;
     role = null;
     roomCode = null;
+    try {
+      old?.destroy();
+    } catch {
+      // ignore teardown races from PeerJS cloud
+    }
+  };
+
+  const attachHostConnection = (gen: number, conn: DataConnection) => {
+    if (guestConn) {
+      conn.close();
+      return;
+    }
+    guestConn = conn;
+    conn.on('open', () => {
+      if (gen !== generation) return;
+      startRoom();
+    });
+    conn.on('data', (data) => {
+      if (gen !== generation) return;
+      try {
+        handleHostMessage(1, data as ClientMessage);
+      } catch {
+        // ignore malformed guest packets
+      }
+    });
+    conn.on('close', () => {
+      if (gen !== generation || !room) return;
+      room.seats[1]!.online = false;
+      broadcast();
+    });
+  };
+
+  const beginHostPeer = (attempt: number) => {
+    clearOpenTimer();
+    const previous = peer;
+    peer = null;
+    try {
+      previous?.destroy();
+    } catch {
+      /* ignore */
+    }
+
+    generation += 1;
+    const gen = generation;
+    const code = randomRoomCode();
+    roomCode = code;
+    handlers.onRoomCode?.(code);
+    setStatus('connecting');
+
+    const next = new Peer(peerIdForRoom(code), peerOptions());
+    peer = next;
+
+    openTimer = setTimeout(() => {
+      if (gen !== generation || status !== 'connecting') return;
+      if (attempt + 1 < MAX_HOST_ATTEMPTS) {
+        beginHostPeer(attempt + 1);
+        return;
+      }
+      setStatus('error', '建立房間逾時，請再試一次');
+    }, OPEN_TIMEOUT_MS);
+
+    next.on('open', () => {
+      if (gen !== generation) return;
+      clearOpenTimer();
+      setStatus('queued');
+      emit({ type: 'queued' });
+    });
+
+    next.on('connection', (conn) => {
+      if (gen !== generation) {
+        conn.close();
+        return;
+      }
+      attachHostConnection(gen, conn);
+    });
+
+    next.on('error', (err) => {
+      if (gen !== generation) return;
+      const type = (err as PeerError<string> | undefined)?.type;
+      const retryable = type === 'unavailable-id' || type === 'network' || type === 'socket-error' || type === 'server-error';
+      if (retryable && attempt + 1 < MAX_HOST_ATTEMPTS) {
+        clearOpenTimer();
+        window.setTimeout(() => {
+          if (gen !== generation) return;
+          beginHostPeer(attempt + 1);
+        }, 400);
+        return;
+      }
+      clearOpenTimer();
+      setStatus('error', errorLabel(err, '無法建立房間，請再試一次'));
+    });
   };
 
   const createRoom = () => {
     destroyPeer();
     role = 'host';
-    roomCode = randomRoomCode();
-    handlers.onRoomCode?.(roomCode);
-    setStatus('connecting');
-    const next = new Peer(peerIdForRoom(roomCode), {
-      debug: 0,
-    });
-    peer = next;
-    next.on('open', () => {
-      setStatus('queued');
-      emit({ type: 'queued' });
-    });
-    next.on('connection', (conn) => {
-      if (guestConn) {
-        conn.close();
-        return;
-      }
-      guestConn = conn;
-      conn.on('open', () => {
-        startRoom();
-      });
-      conn.on('data', (data) => {
-        try {
-          handleHostMessage(1, data as ClientMessage);
-        } catch {
-          // ignore malformed guest packets
-        }
-      });
-      conn.on('close', () => {
-        if (room) {
-          room.seats[1]!.online = false;
-          broadcast();
-        }
-      });
-    });
-    next.on('error', () => {
-      setStatus('error', '無法建立房間，請再試一次');
-    });
+    beginHostPeer(0);
   };
 
   const joinRoom = (code: string) => {
@@ -260,35 +367,54 @@ export function createPeerMatchClient(handlers: {
       return;
     }
     destroyPeer();
+    const gen = generation;
     role = 'guest';
     roomCode = normalized;
     handlers.onRoomCode?.(normalized);
     setStatus('connecting');
-    const next = new Peer({ debug: 0 });
+
+    const next = new Peer(peerOptions());
     peer = next;
+
+    clearOpenTimer();
+    openTimer = setTimeout(() => {
+      if (gen !== generation || status !== 'connecting') return;
+      setStatus('error', '加入房間逾時，請確認房間碼後再試');
+    }, OPEN_TIMEOUT_MS);
+
     next.on('open', () => {
+      if (gen !== generation) return;
       const conn = next.connect(peerIdForRoom(normalized), { reliable: true });
       hostConn = conn;
       conn.on('open', () => {
+        if (gen !== generation) return;
+        clearOpenTimer();
         setStatus('queued');
       });
       conn.on('data', (data) => {
+        if (gen !== generation) return;
         const message = data as ServerMessage;
         if (message.type === 'matched') setStatus('matched');
         if (message.type === 'error') setStatus('error', message.message);
         emit(message);
       });
       conn.on('close', () => {
+        if (gen !== generation) return;
         if (status === 'matched' || status === 'queued' || status === 'connecting') {
           setStatus('idle');
         }
       });
-      conn.on('error', () => {
-        setStatus('error', '找不到房間，請確認房間碼');
+      conn.on('error', (err) => {
+        if (gen !== generation) return;
+        clearOpenTimer();
+        setStatus('error', errorLabel(err, '找不到房間，請確認房間碼'));
       });
     });
-    next.on('error', () => {
-      setStatus('error', '連線失敗，請再試一次');
+
+    next.on('error', (err) => {
+      if (gen !== generation) return;
+      clearOpenTimer();
+      setStatus('error', errorLabel(err, '連線失敗，請再試一次'));
     });
   };
 
@@ -297,11 +423,12 @@ export function createPeerMatchClient(handlers: {
       return status;
     },
     error: null,
-    roomCode,
+    get roomCode() {
+      return roomCode;
+    },
     createRoom,
     joinRoom,
     connectAndQueue: () => {
-      // Kept for API compatibility; prefer createRoom/joinRoom.
       createRoom();
     },
     cancel: () => {
