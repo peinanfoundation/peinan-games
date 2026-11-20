@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>培楠教育小遊戲</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #1f2937;
+        --brand: #0f766e;
+        --card: #ffffff;
+        --bg: #ecfdf5;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at top left, #a7f3d0 0, transparent 40%),
+          radial-gradient(circle at bottom right, #99f6e4 0, transparent 35%),
+          var(--bg);
+        display: grid;
+        place-items: center;
+        padding: 24px;
+      }
+      main {
+        width: min(720px, 100%);
+        background: var(--card);
+        border-radius: 24px;
+        padding: 32px 28px;
+        box-shadow: 0 18px 50px rgba(15, 118, 110, 0.12);
+      }
+      h1 { margin: 0 0 8px; font-size: 1.8rem; }
+      p { margin: 0 0 24px; color: #4b5563; line-height: 1.6; }
+      .grid { display: grid; gap: 14px; }
+      a.card {
+        display: block;
+        text-decoration: none;
+        color: inherit;
+        border: 1px solid #d1fae5;
+        border-radius: 16px;
+        padding: 18px 16px;
+        background: #f8fffc;
+        transition: transform .15s ease, box-shadow .15s ease;
+      }
+      a.card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 24px rgba(15, 118, 110, 0.12);
+      }
+      a.card strong { display: block; font-size: 1.15rem; color: var(--brand); margin-bottom: 6px; }
+      a.card span { color: #6b7280; font-size: 0.95rem; line-height: 1.5; }
+      .note { margin-top: 18px; font-size: 0.85rem; color: #6b7280; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>培楠教育小遊戲</h1>
+      <p>由培楠愛國教育基金提供。遊戲託管於 GitHub Pages，不經 Vercel。</p>
+      <div class="grid">
+        <a class="card" href="./">
+          <strong>釣魚</strong>
+          <span>等待上鉤、停在安全區、拉扯收線。適合單人遊玩。</span>
+        </a>
+        <a class="card" href="./?game=cooking">
+          <strong>記憶烹飪</strong>
+          <span>單人闖關，或與朋友用 PeerJS 房間碼連線對戰（無需伺服器）。</span>
+        </a>
+      </div>
+      <p class="note">培楠基金 · peinanfoundation/peinan-games</p>
+    </main>
+  </body>
+</html>
