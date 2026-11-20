@@ -211,23 +211,19 @@ export function tierOf(catches: number): number {
   return Math.min(TIER_NAMES.length - 1, Math.floor(Math.max(0, catches) / 2));
 }
 
-export function fishPool(catches: number): FishKind[] {
-  const n = Math.max(0, catches);
-  const early = Math.min(5, 1 + Math.floor(n / 2));
-  const extra = n >= 8 ? Math.min(FISHES.length - 5, n - 8) : 0;
-  return FISHES.slice(0, early + extra);
+export function nextFishIndex(catches: number): number {
+  if (FISHES.length === 0) return 0;
+  return Math.max(0, Math.floor(catches)) % FISHES.length;
 }
 
-export function pickFish(catches: number, rng: () => number): FishKind {
-  const pool = fishPool(catches);
-  const weights = pool.map((_, index) => pool.length - index);
-  const total = weights.reduce((sum, weight) => sum + weight, 0);
-  let roll = rng() * total;
-  for (let index = 0; index < pool.length; index += 1) {
-    roll -= weights[index];
-    if (roll <= 0) return pool[index];
-  }
-  return pool[0];
+export function fishPool(catches: number): FishKind[] {
+  const n = Math.max(0, Math.floor(catches));
+  if (n >= FISHES.length) return FISHES.slice();
+  return FISHES.slice(0, n + 1);
+}
+
+export function pickFish(catches: number, _rng?: () => number): FishKind {
+  return FISHES[nextFishIndex(catches)];
 }
 
 export function rollBiteDelay(rng: () => number): number {

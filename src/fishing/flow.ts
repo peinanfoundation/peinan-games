@@ -163,7 +163,7 @@ function enterWait(sim: Sim, rng: () => number, announce: boolean): Sim {
     award: null,
     repeat: false,
     message: '等魚上釣',
-    detail: unlocked ? `${TIER_NAMES[tier]}，更大的魚會出現` : '魚線左右擺，上釣再按空白鍵',
+    detail: unlocked ? `${TIER_NAMES[tier]}，下一條會更難` : '魚線左右擺，上釣再按空白鍵',
     shake: 0,
   };
 }

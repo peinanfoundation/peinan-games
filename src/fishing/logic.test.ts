@@ -10,6 +10,7 @@ import {
   counterKeys,
   fishPool,
   gaugeMarker,
+  nextFishIndex,
   pickFish,
   rollBiteDelay,
   scoreCatch,
@@ -172,6 +173,7 @@ describe('tug of war', () => {
 
   it('lets a repeat catch be skipped without changing the score', () => {
     let sim = hooked();
+    expect(sim.repeat).toBe(false);
     expect(skipCatch(sim, zero).mode).toBe('gauge');
 
     sim = advance(sim, sim.fish!.period / 4);
@@ -183,27 +185,30 @@ describe('tug of war', () => {
       guard += 1;
     }
     const score = sim.score;
-    const catches = sim.catches;
     sim = advance(sim, 3.3);
+    expect(sim.mode).toBe('wait');
+
+    sim = {
+      ...sim,
+      catches: FISHES.length,
+      seen: FISHES.map((fish) => fish.id),
+      score,
+    };
     sim = advance(sim, sim.biteDelay + 0.02);
     sim = pressSpace(sim, zero);
-    expect(sim.repeat).toBe(true);
     expect(sim.fish?.id).toBe('crucian');
+    expect(sim.repeat).toBe(true);
     sim = skipCatch(sim, zero);
     expect(sim.mode).toBe('wait');
     expect(sim.score).toBe(score);
-    expect(sim.catches).toBe(catches);
+    expect(sim.catches).toBe(FISHES.length);
     expect(sim.repeat).toBe(false);
   });
 });
 
 describe('fish layers', () => {
-  it('opens rarer fish as catches build', () => {
-    expect(fishPool(0).map((fish) => fish.id)).toEqual(['crucian']);
-    expect(fishPool(3).map((fish) => fish.id)).toEqual(['crucian', 'carp']);
-    expect(fishPool(8)).toHaveLength(5);
-    expect(fishPool(9).map((fish) => fish.id).at(-1)).toBe('seabream');
-    expect(fishPool(13).map((fish) => fish.id)).toEqual([
+  it('follows the difficulty order by catch count', () => {
+    expect(FISHES.map((fish) => fish.id)).toEqual([
       'crucian',
       'carp',
       'catfish',
@@ -215,10 +220,20 @@ describe('fish layers', () => {
       'shark',
       'piranha',
     ]);
-    expect(pickFish(0, () => 0.99).id).toBe('crucian');
-    expect(pickFish(13, () => 0.99).id).toBe('piranha');
-    const seen = new Set(Array.from({ length: 40 }, (_, index) => pickFish(8, () => (index + 1) / 41).id));
-    expect(seen.has('arowana')).toBe(true);
+    expect(fishPool(0).map((fish) => fish.id)).toEqual(['crucian']);
+    expect(fishPool(3).map((fish) => fish.id)).toEqual(['crucian', 'carp', 'catfish', 'bass']);
+    expect(fishPool(9).map((fish) => fish.id)).toEqual(FISHES.map((fish) => fish.id));
+    expect(fishPool(13).map((fish) => fish.id)).toEqual(FISHES.map((fish) => fish.id));
+    expect(nextFishIndex(0)).toBe(0);
+    expect(nextFishIndex(4)).toBe(4);
+    expect(nextFishIndex(9)).toBe(9);
+    expect(nextFishIndex(10)).toBe(0);
+    expect(pickFish(0).id).toBe('crucian');
+    expect(pickFish(1).id).toBe('carp');
+    expect(pickFish(4).id).toBe('arowana');
+    expect(pickFish(5).id).toBe('seabream');
+    expect(pickFish(9).id).toBe('piranha');
+    expect(pickFish(10).id).toBe('crucian');
     const piranha = FISHES.find((fish) => fish.id === 'piranha');
     expect(piranha?.points).toBeLessThan(0);
     expect(scoreCatch(piranha!, 0.5, 0)).toEqual({ base: -30, perfect: 0, steady: 0, total: -30 });
